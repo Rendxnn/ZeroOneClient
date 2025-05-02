@@ -69,5 +69,23 @@ namespace ZeroOneClient.DTOs
             [JsonPropertyName("ClienteId")]
             public string ClientId { get; set; } = null!;
         }
+
+        public record VistaResponse<T>
+        {
+            [JsonPropertyName("VistaPadreId")]
+            public string VistaPadreId { get; set; } = string.Empty;
+
+            [JsonPropertyName("Items")]
+            public List<T> Items { get; set; } = new();
+        }
+
+        public record Registro<T>
+        {
+            [JsonPropertyName("Dato")]
+            public T Dato { get; set; } = default!;
+
+            [JsonPropertyName("Parametros")]
+            public Dictionary<string, object> Parametros { get; set; } = new();
+        }
     }
 }

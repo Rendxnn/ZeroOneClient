@@ -6,6 +6,9 @@ using static ZeroOneClient.DTOs.ZeroOneModels;
 
 namespace ZeroOneClient;
 
+/// <summary>
+/// Cliente para interactuar con la API de ZeroOne  
+/// </summary>
 public class ZeroOneClient
 {
     private readonly Uri _baseUrl;
@@ -30,12 +33,6 @@ public class ZeroOneClient
         _httpClient = new HttpClient();
     }
 
-    public record VistaResponse<T>
-    {
-        public string VistaPadreId { get; set; } = string.Empty;
-        public List<T> Items { get; set; } = new();
-    }
-
     /// <summary>
     /// Obtiene los datos de una vista específica con paginación y ordenamiento
     /// </summary>
@@ -51,7 +48,7 @@ public class ZeroOneClient
     {
         try
         {
-            if (!isAuthenticated()) await Login();
+            if (!IsAuthenticated()) await Login();
 
             var uriBuilder = new UriBuilder(_baseUrl);
             uriBuilder.Path = Path.Combine(uriBuilder.Path, "vistas", vistaId, "datos").Replace("\\", "/");
@@ -89,7 +86,54 @@ public class ZeroOneClient
             return null;
         }
     }
+    
+    /// <summary>
+    /// Crea un registro en ZeroOne para una vista específica
+    /// </summary>
+    /// <typeparam name="T">Tipo de datos a crear (lo que va dentro de Dato en la petición a ZeroOne)</typeparam>
+    /// <param name="vistaId">ID de la vista</param>
+    /// <param name="dato">Registro a crear</param>
+    /// <returns>Datos creados</returns>
+    public async Task<T>? CrearRegistro<T>(string vistaId, T dato)
+    {
+        if (!IsAuthenticated()) await Login();
 
+        var uriBuilder = new UriBuilder(_baseUrl);
+        
+        uriBuilder.Path = Path.Combine(uriBuilder.Path, "vistas", vistaId).Replace("\\", "/");
+
+        Registro<T> registro = new() { Dato = dato, Parametros = new Dictionary<string, object>() };
+
+        string serializedRequest = JsonConvert.SerializeObject(registro);
+
+        StringContent requestContent = new(serializedRequest, Encoding.UTF8, "application/json");
+
+        HttpResponseMessage response = await _httpClient.PostAsync(uriBuilder.Uri, requestContent);
+
+        string responseContent = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode) 
+        {
+            Console.WriteLine($"Error creando registro en ZeroOne. Código de respuesta {response.StatusCode}. {responseContent}");
+            return default!;
+        }
+
+        T? creado = JsonConvert.DeserializeObject<T>(responseContent);
+
+        if (creado == null)
+        {
+            Console.WriteLine("El deserializado resultó null");
+            return default!;
+        }
+
+        return creado;
+    }   
+
+    /// <summary>
+    /// Realiza el login en ZeroOne y guarda el token de acceso en el header de la petición 
+    /// </summary>
+    /// <returns>Token de acceso</returns>
+    /// <exception cref="Exception">Excepción que ocurre si el login falla</exception>
     private async Task Login()
     {
         Uri baseUrl = new(_baseUrl, "auth/login");
@@ -115,7 +159,11 @@ public class ZeroOneClient
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {loginResponse.Token}");
     }
 
-    private bool isAuthenticated()
+    /// <summary>
+    /// Verifica si el token de acceso está expirado o si no existe
+    /// </summary>
+    /// <returns>True si el token está expirado, false en caso contrario</returns>
+    private bool IsAuthenticated()
     {
         if (_accessToken == null) return false;
 
