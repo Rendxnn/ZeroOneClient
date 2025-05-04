@@ -130,6 +130,13 @@ public class ZeroOneClient
         return creado.First();
     }   
 
+    /// <summary>
+    /// Realiza una carga masiva de datos en ZeroOne para una vista específica
+    /// </summary>
+    /// <typeparam name="T">Tipo de datos a crear (lo que va dentro de datos en la petición a ZeroOne)</typeparam>
+    /// <param name="vistaId">ID de la vista</param>
+    /// <param name="datos">Lista de datos a crear</param>
+    /// <returns>Colección de datos creados</returns>
     public async Task<Collection<T>?> CargaMasiva<T>(string vistaId, List<T> datos) 
     {
         if (!IsAuthenticated()) await Login();
