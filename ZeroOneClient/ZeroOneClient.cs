@@ -3,6 +3,7 @@ using System.Text;
 using System.Web;
 using System.IdentityModel.Tokens.Jwt;
 using static ZeroOneClient.DTOs.ZeroOneModels;
+using System.Collections.ObjectModel;
 
 namespace ZeroOneClient;
 
@@ -41,7 +42,7 @@ public class ZeroOneClient
     /// <param name="numeroPagina">Número de página actual</param>
     /// <param name="tamañoPagina">Cantidad de registros por página</param>
     /// <param name="ordenarPorFecha">Indica si se debe ordenar por fecha</param>
-    /// <para m name="ordenarPorProyecto">Indica si se debe ordenar por proyecto</param>
+    /// <param name="ordenarPorProyecto">Indica si se debe ordenar por proyecto</param>
     /// <param name="ordenarPorUsuario">Indica si se debe ordenar por usuario</param>
     /// <returns>Colección de elementos del tipo especificado</returns>
     public async Task<VistaResponse<T>?> ObtenerVista<T>(string vistaId, int numeroPagina, int tamañoPagina, bool ordenarPorFecha = false, bool ordenarPorProyecto = false, bool ordenarPorUsuario = false)
@@ -94,7 +95,7 @@ public class ZeroOneClient
     /// <param name="vistaId">ID de la vista</param>
     /// <param name="dato">Registro a crear</param>
     /// <returns>Datos creados</returns>
-    public async Task<T>? CrearRegistro<T>(string vistaId, T dato)
+    public async Task<T?> CrearRegistro<T>(string vistaId, T dato)
     {
         if (!IsAuthenticated()) await Login();
 
@@ -118,7 +119,7 @@ public class ZeroOneClient
             return default!;
         }
 
-        T? creado = JsonConvert.DeserializeObject<T>(responseContent);
+        List<T>? creado = JsonConvert.DeserializeObject<List<T>>(responseContent);
 
         if (creado == null)
         {
@@ -126,8 +127,31 @@ public class ZeroOneClient
             return default!;
         }
 
-        return creado;
+        return creado.First();
     }   
+
+    public async Task<Collection<T>?> CargaMasiva<T>(string vistaId, List<T> datos) 
+    {
+        if (!IsAuthenticated()) await Login();
+
+        UriBuilder uriBuilder = new(_baseUrl);
+        uriBuilder.Path = Path.Combine(uriBuilder.Path, "vistas", vistaId, "carga-masiva-datos").Replace("\\", "/");
+
+        object requestObject = new { datos = datos };
+        StringContent requestContent = new(JsonConvert.SerializeObject(requestObject), Encoding.UTF8, "application/json");
+        
+        HttpResponseMessage response = await _httpClient.PostAsync(uriBuilder.Uri, requestContent);
+
+        string responseContent = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.WriteLine($"Error realizando carga masiva en ZeroOne. Código de respuesta {response.StatusCode}. {responseContent}");
+            return null;
+        }
+
+        return JsonConvert.DeserializeObject<Collection<T>>(responseContent);
+    }
 
     /// <summary>
     /// Realiza el login en ZeroOne y guarda el token de acceso en el header de la petición 
@@ -156,7 +180,10 @@ public class ZeroOneClient
         LoginResponse loginResponse = JsonConvert.DeserializeObject<LoginResponse>(responseContent)
             ?? throw new Exception("Error while trying to log in");
 
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {loginResponse.Token}");
+
+        _accessToken = loginResponse.Token;
     }
 
     /// <summary>
